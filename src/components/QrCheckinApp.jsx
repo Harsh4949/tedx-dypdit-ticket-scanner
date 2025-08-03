@@ -165,8 +165,8 @@ export default function QRCheckinApp() {
   if (appState === 'scanning') {
     return (
       <div className="min-h-screen p-4 text-gray-100">
-        <div className="max-w-md mx-auto space-y-6">
           <Logo />
+        <div className="max-w-md mx-auto space-y-6 border p-2 pb-5 rounded-3xl border-white/30">
           <div className="text-center py-4">
             <div className="mx-auto w-14 h-14 bg-black border-4 border-red-600 rounded-full flex items-center justify-center mb-3 shadow-lg">
               <QrCodeIcon className="w-7 h-7 text-white" />
@@ -246,7 +246,7 @@ export default function QRCheckinApp() {
           </div>
 
           <div className="flex flex-col gap-2 mt-2">
-            <div className={`bg-black bg-opacity-80 ${scannerStatus === 'Ready to scan' ? 'text-green-400 border-green-700' : 'border-red-700 text-red-400'} text-xs rounded px-2 py-1 text-center border  font-semibold`}>
+            <div className={`bg-black bg-opacity-80 ${scannerStatus === 'Ready to scan' ? 'text-green-400 ' : ' text-red-400'} text-xs rounded px-2 py-1 text-center  font-semibold`}>
               Status: {scannerStatus} {debugMessage && `| ${debugMessage}`}
             </div>
             <div className="flex gap-2 justify-center">
@@ -254,7 +254,7 @@ export default function QRCheckinApp() {
                 <button
                   type="button"
                   onClick={handleStopScan}
-                  className="flex items-center gap-2 bg-red-700 text-white text-xs px-3 py-1 rounded shadow hover:bg-red-800 font-bold"
+                  className="flex items-center gap-2 bg-red-700 text-white text-xs px-4 py-2 rounded shadow hover:bg-red-800 font-bold "
                 >
                   Stop Scan
                 </button>
