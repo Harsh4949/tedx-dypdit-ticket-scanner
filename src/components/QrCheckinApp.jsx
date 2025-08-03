@@ -161,9 +161,6 @@ export default function QRCheckinApp() {
     </div>
   );
 
-  // --- Responsive video aspect ratio for scanner ---
-  // We'll use a 16:9 aspect ratio for the video container, and ensure the video fills it.
-  // On mobile, this will keep the video landscape and not too tall.
 
   if (appState === 'scanning') {
     return (
@@ -178,7 +175,7 @@ export default function QRCheckinApp() {
             <p className="text-gray-400 text-base mt-1 font-medium">Position QR code within the frame</p>
           </div>
 
-          <div className="bg-zinc-900 rounded-xl overflow-hidden shadow border border-zinc-800">
+          <div className="bg-zinc-900 rounded-xl overflow-hidden shadow">
             {cameraError ? (
               <div className="p-6 text-center space-y-4">
                 <div className="mx-auto w-16 h-16 bg-red-900 rounded-full flex items-center justify-center">
@@ -202,38 +199,47 @@ export default function QRCheckinApp() {
               <div className="relative w-full">
                 {/* Responsive aspect-ratio box for video */}
                 <div
-                  className="w-full"
+                  className="w-full flex justify-center"
                   style={{
                     position: 'relative',
                     width: '100%',
-                    aspectRatio: '16/9',
                     background: 'black',
                   }}
                 >
-                  <video
-                    ref={videoRef}
-                    className="absolute top-0 left-0 w-full h-full object-cover bg-black rounded"
-                    autoPlay
-                    playsInline
-                    muted
+                  <div
                     style={{
-                      display: isScanning ? 'block' : 'block',
-                      // fallback for browsers without aspect-ratio support
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: '0.75rem',
+                      width: '80%',
+                      maxWidth: '320px',
+                      aspectRatio: '1/1',
+                      position: 'relative',
                       background: 'black',
+                      borderRadius: '0.75rem',
                     }}
-                  />
-                  {isScanning && (
-                    <div className="absolute inset-4 border-2 border-white rounded-xl pointer-events-none">
-                      <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-green-600 rounded-tl-xl"></div>
-                      <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-green-600 rounded-tr-xl"></div>
-                      <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-green-600 rounded-bl-xl"></div>
-                      <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-green-600 rounded-br-xl"></div>
-                    </div>
-                  )}
+                  >
+                    <video
+                      ref={videoRef}
+                      className="absolute top-0 left-0 w-full h-full object-cover bg-black rounded"
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        display: isScanning ? 'block' : 'block',
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: '0.75rem',
+                        background: 'black',
+                      }}
+                    />
+                    {isScanning && (
+                      <div className="absolute inset-3 border-2 border-white rounded-xl pointer-events-none">
+                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-600 rounded-tl-xl"></div>
+                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-600 rounded-tr-xl"></div>
+                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-600 rounded-bl-xl"></div>
+                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-600 rounded-br-xl"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
