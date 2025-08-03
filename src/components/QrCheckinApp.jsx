@@ -161,6 +161,10 @@ export default function QRCheckinApp() {
     </div>
   );
 
+  // --- Responsive video aspect ratio for scanner ---
+  // We'll use a 16:9 aspect ratio for the video container, and ensure the video fills it.
+  // On mobile, this will keep the video landscape and not too tall.
+
   if (appState === 'scanning') {
     return (
       <div className="min-h-screen p-4 text-gray-100">
@@ -195,24 +199,42 @@ export default function QRCheckinApp() {
                 </button>
               </div>
             ) : (
-              <div className="relative">
-                <video
-                  ref={videoRef}
-                  className="w-full bg-black rounded"
-                  height={100}
-                  autoPlay
-                  playsInline
-                  muted
-                  style={{ display: isScanning ? 'block' : 'block' }}
-                />
-                {isScanning && (
-                  <div className="absolute inset-4 border-2 border-white rounded-xl pointer-events-none">
-                    <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-green-600 rounded-tl-xl"></div>
-                    <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-green-600 rounded-tr-xl"></div>
-                    <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-green-600 rounded-bl-xl"></div>
-                    <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-green-600 rounded-br-xl"></div>
-                  </div>
-                )}
+              <div className="relative w-full">
+                {/* Responsive aspect-ratio box for video */}
+                <div
+                  className="w-full"
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '16/9',
+                    background: 'black',
+                  }}
+                >
+                  <video
+                    ref={videoRef}
+                    className="absolute top-0 left-0 w-full h-full object-cover bg-black rounded"
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      display: isScanning ? 'block' : 'block',
+                      // fallback for browsers without aspect-ratio support
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '0.75rem',
+                      background: 'black',
+                    }}
+                  />
+                  {isScanning && (
+                    <div className="absolute inset-4 border-2 border-white rounded-xl pointer-events-none">
+                      <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-green-600 rounded-tl-xl"></div>
+                      <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-green-600 rounded-tr-xl"></div>
+                      <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-green-600 rounded-bl-xl"></div>
+                      <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-green-600 rounded-br-xl"></div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -239,16 +261,7 @@ export default function QRCheckinApp() {
                   Start Scan
                 </button>
               )}
-              {hasMultipleCameras && (
-                <button
-                  type="button"
-                  onClick={handleFlipCamera}
-                  className="flex items-center gap-2 bg-zinc-800 text-gray-200 text-xs px-3 py-1 rounded shadow hover:bg-zinc-700 border border-zinc-700"
-                >
-                  <Camera className="w-4 h-4" />
-                  Flip Camera
-                </button>
-              )}
+             
             </div>
           </div>
 
@@ -365,33 +378,7 @@ export default function QRCheckinApp() {
 
               <hr className="border-zinc-800" />
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="checker-name" className="block font-medium">Your Full Name</label>
-                  <input
-                    id="checker-name"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={checkerName}
-                    onChange={(e) => setCheckerName(e.target.value)}
-                    required
-                    className="w-full border border-zinc-700 bg-black px-3 py-2 rounded text-gray-100 placeholder-gray-500"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="checker-email" className="block font-medium">Your Email</label>
-                  <input
-                    id="checker-email"
-                    type="email"
-                    placeholder="Enter your email address"
-                    value={checkerEmail}
-                    onChange={(e) => setCheckerEmail(e.target.value)}
-                    required
-                    className="w-full border border-zinc-700 bg-black px-3 py-2 rounded text-gray-100 placeholder-gray-500"
-                  />
-                </div>
-              </div>
+              
 
               <div className="flex gap-3">
                 <button
