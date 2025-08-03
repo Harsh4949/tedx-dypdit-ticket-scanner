@@ -2,12 +2,13 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import QRCheckinApp from './components/QrCheckinApp'
 
 function App() {
 
   return (
     <>
-     <h1>This is Tedx ticket verifation </h1>
+      <QRCheckinApp />
     </>
   )
 }
