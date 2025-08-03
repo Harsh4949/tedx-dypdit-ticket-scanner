@@ -2,16 +2,13 @@ import { RotateCcwIcon, XIcon, QrCodeIcon, TicketIcon, Check, Ticket, User, Hash
 import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner'
 
-// Fix for "The play() request was interrupted by a new load request":
-// - Only instantiate QrScanner after the video element is attached and ready
-// - Clean up QrScanner before creating a new one
-// - Avoid multiple QrScanner instances or repeated starts
+// TEDx theme: dark, bold, red/white/black, logo space at top
 
 export default function QRCheckinApp() {
   const videoRef = useRef(null);
-  const qrScannerRef = useRef(null); // Keep a persistent ref to the scanner
+  const qrScannerRef = useRef(null);
 
-  const [appState, setAppState] = useState('scanning'); // scanning | scanned 
+  const [appState, setAppState] = useState('scanning');
   const [cameraError, setCameraError] = useState('');
 
   const [checkerName, setCheckerName] = useState('');
@@ -28,18 +25,16 @@ export default function QRCheckinApp() {
     registrationId: 'REG123',
     ticketType: 'VIP'
   });
+
   const [isPresent, setIsPresent] = useState(false);
 
-  // Camera facing mode state
-  const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
+  const [facingMode, setFacingMode] = useState('environment');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
-
-  // New: Control scanning state
   const [isScanning, setIsScanning] = useState(true);
 
-  // Check for multiple cameras (mobile devices)
+  const [scanner, setScanner] = useState(null)
+
   useEffect(() => {
-    // Only run in browser
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     navigator.mediaDevices.enumerateDevices().then((devices) => {
       const videoInputs = devices.filter((d) => d.kind === 'videoinput');
@@ -47,13 +42,9 @@ export default function QRCheckinApp() {
     });
   }, []);
 
-  // Only start scanner when in scanning state or facingMode changes or isScanning changes
   useEffect(() => {
     let isMounted = true;
-
-    // Only start scanner if in scanning state and isScanning is true
     if (appState !== 'scanning' || !isScanning) {
-      // Stop and destroy scanner if not scanning
       if (qrScannerRef.current) {
         qrScannerRef.current.stop();
         qrScannerRef.current.destroy();
@@ -61,74 +52,50 @@ export default function QRCheckinApp() {
       }
       return;
     }
-
     const videoEl = videoRef.current;
     if (!videoEl) return;
-
-    // Set disablePictureInPicture property safely after ref is attached
     videoEl.disablePictureInPicture = true;
 
     setScannerStatus('Initializing...');
 
-    // Clean up any previous scanner before creating a new one
     if (qrScannerRef.current) {
       qrScannerRef.current.stop();
       qrScannerRef.current.destroy();
       qrScannerRef.current = null;
     }
-
-    // Helper to handle play() errors
+    const constraints = { facingMode: { exact: facingMode } };
+    const qrScanner = new QrScanner(
+      videoEl,
+      (result) => {
+        if (!isMounted) return;
+        setLastScanRaw(result.data || result);
+        setAppState('scanned');
+        setScannerStatus('Scan complete');
+        setDebugMessage('');
+        // Optionally, parse ticketData from result here
+        // setTicketData(...)
+        console.log(result)
+      },
+      constraints
+    );
     const startScanner = async () => {
       try {
-        // Get camera constraints
-        const constraints = {
-          facingMode: { exact: facingMode }
-        };
-
-        // QrScanner supports passing constraints as third argument
-        const qrScanner = new QrScanner(
-          videoEl,
-          (result) => {
-            if (!isMounted) return;
-            setLastScanRaw(result.data || result); // result.data for detailed, fallback to result
-            setAppState('scanned');
-            setScannerStatus('Scan complete');
-            setDebugMessage('');
-            // Optionally, parse ticketData from result here
-            // setTicketData(...)
-            console.log(result)
-          },
-          constraints
-        );
-
-      
-
-        // Patch: Suppress "No QR code found" errors from flooding UI
         qrScanner.onDecodeError = (error) => {
-          // Only show error if it's not the common "No QR code found"
           if (
             error &&
             typeof error === 'object' &&
             error.name === 'NotFoundException'
           ) {
-            // Don't update scanError or scannerStatus for this
-            // Optionally, you could set a subtle debug message here if needed
-            // setDebugMessage('No QR code found');
             return;
           }
-          // For other errors, show a message
           setScanError(error.message || String(error));
           setScannerStatus('Scanner error');
           setDebugMessage('');
         };
-
-        // Wait for video element to be ready before starting
-        // This prevents play() being called before video is ready
         qrScanner.start();
-
+        setScanner(qrScanner)
         setScannerStatus('Ready to scan');
       } catch (err) {
-        // Handle camera access errors
         setCameraError('Camera error: ' + err.message);
         setScannerStatus('Camera error');
         setDebugMessage('');
@@ -137,26 +104,17 @@ export default function QRCheckinApp() {
 
     startScanner();
 
-    // Cleanup on unmount or when appState/facingMode/isScanning changes
     return () => {
       isMounted = false;
       if (qrScannerRef.current) {
-        qrScannerRef.current.stop();
-        qrScannerRef.current.destroy();
-        qrScannerRef.current = null;
+        scanner.stop();
+        scanner.destroy();
+        setScanner(null)
       }
     };
   }, [appState, facingMode, isScanning]);
 
-  const generateSampleQR = () => {
-    setTicketData({
-      name: 'John Doe',
-      registrationId: 'ABC123',
-      ticketType: 'General'
-    });
-    setLastScanRaw('SampleQRCode123');
-    setAppState('scanned');
-  };
+
 
   const resetForNextScan = () => {
     setAppState('scanning');
@@ -170,14 +128,13 @@ export default function QRCheckinApp() {
     setScannerStatus('Initializing...');
     setDebugMessage('');
     setLastScanRaw('');
-    setIsScanning(true); // Reset scanning state
+    setIsScanning(true);
   };
 
   const handleFlipCamera = () => {
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  // New: Handlers for start/stop scan
   const handleStartScan = () => {
     setIsScanning(true);
     setScannerStatus('Initializing...');
@@ -189,41 +146,50 @@ export default function QRCheckinApp() {
   const handleStopScan = () => {
     setIsScanning(false);
     setScannerStatus('Scanner stopped');
-    if (qrScannerRef.current) {
-      qrScannerRef.current.stop();
-      qrScannerRef.current.destroy();
-      qrScannerRef.current = null;
-    }
+    scanner.stop()
   };
+
+  // TEDx logo and theme
+  const Logo = () => (
+    <div className="flex flex-col items-center mb-20 mt-8 select-none">
+      <img
+        src="/TEDX.svg"
+        alt="TEDx Logo"
+        className="w-72 md:w-96 absolute top-10 left-1/2 -translate-x-1/2 opacity-90 pointer-events-none select-none"
+        style={{ zIndex: 0 }}
+      />
+    </div>
+  );
 
   if (appState === 'scanning') {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen p-4 text-gray-100">
         <div className="max-w-md mx-auto space-y-6">
+          <Logo />
           <div className="text-center py-4">
-            <div className="mx-auto w-12 h-12 bg-gray-900 rounded-full flex items-center justify-center mb-3">
-              <QrCodeIcon className="w-6 h-6 text-white" />
+            <div className="mx-auto w-14 h-14 bg-black border-4 border-red-600 rounded-full flex items-center justify-center mb-3 shadow-lg">
+              <QrCodeIcon className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Event Check-in</h1>
-            <p className="text-gray-600 text-sm mt-1">Position QR code within the frame</p>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight">Event Check-in</h1>
+            <p className="text-gray-400 text-base mt-1 font-medium">Position QR code within the frame</p>
           </div>
 
-          <div className="bg-white rounded-lg overflow-hidden shadow">
+          <div className="bg-zinc-900 rounded-xl overflow-hidden shadow border border-zinc-800">
             {cameraError ? (
               <div className="p-6 text-center space-y-4">
-                <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                  <XIcon className="w-8 h-8 text-red-600" />
+                <div className="mx-auto w-16 h-16 bg-red-900 rounded-full flex items-center justify-center">
+                  <XIcon className="w-8 h-8 text-red-400" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Camera Error</h3>
-                  <p className="text-sm text-gray-600 mt-1">{cameraError}</p>
+                  <h3 className="font-semibold text-white">Camera Error</h3>
+                  <p className="text-sm text-gray-400 mt-1">{cameraError}</p>
                   {debugMessage && (
                     <p className="text-xs text-gray-500 mt-1">{debugMessage}</p>
                   )}
                 </div>
                 <button
                   onClick={() => window.location.reload()}
-                  className="flex items-center gap-2 px-4 py-2 border rounded hover:bg-gray-100"
+                  className="flex items-center gap-2 px-4 py-2 border border-red-600 rounded hover:bg-red-700 hover:text-white text-red-500 font-bold transition"
                 >
                   <RotateCcwIcon className="w-4 h-4" /> Retry
                 </button>
@@ -237,24 +203,22 @@ export default function QRCheckinApp() {
                   autoPlay
                   playsInline
                   muted
-                  style={{ display: isScanning ? 'block' : 'block' }} // Always show video for layout
+                  style={{ display: isScanning ? 'block' : 'block' }}
                 />
-                {/* Show scan frame only if scanning */}
                 {isScanning && (
-                  <div className="absolute inset-4 border-2 border-white rounded-lg pointer-events-none">
-                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-500 rounded-tl-lg"></div>
-                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-500 rounded-tr-lg"></div>
-                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-500 rounded-bl-lg"></div>
-                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-500 rounded-br-lg"></div>
+                  <div className="absolute inset-4 border-2 border-white rounded-xl pointer-events-none">
+                    <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-green-600 rounded-tl-xl"></div>
+                    <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-green-600 rounded-tr-xl"></div>
+                    <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-green-600 rounded-bl-xl"></div>
+                    <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-green-600 rounded-br-xl"></div>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Status and scan controls below video */}
           <div className="flex flex-col gap-2 mt-2">
-            <div className="bg-black bg-opacity-70 text-white text-xs rounded px-2 py-1 text-center">
+            <div className={`bg-black bg-opacity-80 ${scannerStatus === 'Ready to scan' ? 'text-green-400 border-green-700' : 'border-red-700 text-red-400'} text-xs rounded px-2 py-1 text-center border  font-semibold`}>
               Status: {scannerStatus} {debugMessage && `| ${debugMessage}`}
             </div>
             <div className="flex gap-2 justify-center">
@@ -262,7 +226,7 @@ export default function QRCheckinApp() {
                 <button
                   type="button"
                   onClick={handleStopScan}
-                  className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-1 rounded shadow hover:bg-red-700"
+                  className="flex items-center gap-2 bg-red-700 text-white text-xs px-3 py-1 rounded shadow hover:bg-red-800 font-bold"
                 >
                   Stop Scan
                 </button>
@@ -270,7 +234,7 @@ export default function QRCheckinApp() {
                 <button
                   type="button"
                   onClick={handleStartScan}
-                  className="flex items-center gap-2 bg-green-600 text-white text-xs px-3 py-1 rounded shadow hover:bg-green-700"
+                  className="flex items-center gap-2 bg-green-700 text-white text-xs px-3 py-1 rounded shadow hover:bg-green-800 font-bold"
                 >
                   Start Scan
                 </button>
@@ -279,7 +243,7 @@ export default function QRCheckinApp() {
                 <button
                   type="button"
                   onClick={handleFlipCamera}
-                  className="flex items-center gap-2 bg-white bg-opacity-80 text-gray-800 text-xs px-3 py-1 rounded shadow hover:bg-gray-100"
+                  className="flex items-center gap-2 bg-zinc-800 text-gray-200 text-xs px-3 py-1 rounded shadow hover:bg-zinc-700 border border-zinc-700"
                 >
                   <Camera className="w-4 h-4" />
                   Flip Camera
@@ -289,84 +253,74 @@ export default function QRCheckinApp() {
           </div>
 
           {scanError && (
-            <div className="bg-red-100 text-red-700 px-4 py-2 rounded text-sm">{scanError}</div>
+            <div className="bg-red-900 text-red-300 px-4 py-2 rounded text-sm border border-red-700 font-semibold">{scanError}</div>
           )}
 
           {lastScanRaw && (
             <div className="text-center">
               <button
                 onClick={() => setShowScanResult(!showScanResult)}
-                className="mt-2 px-4 py-2 border rounded hover:bg-gray-100 flex items-center gap-2"
+                className="mt-2 px-4 py-2 border border-zinc-700 rounded hover:bg-zinc-800 flex items-center gap-2 text-gray-100 font-semibold"
               >
-                {/* EyeIcon is not imported, so use a fallback or remove */}
-                {/* <EyeIcon className="w-4 h-4" /> */}
                 {showScanResult ? 'Hide Scan Result' : 'Show Scan Result'}
               </button>
             </div>
           )}
 
           {showScanResult && lastScanRaw && (
-            <div className="bg-white rounded shadow p-4 text-xs whitespace-pre-wrap break-words">
-              <label className="text-sm font-semibold mb-1 block">Raw QR Scan Result:</label>
-              <pre className="bg-gray-100 p-2 rounded">{lastScanRaw}</pre>
+            <div className="bg-zinc-900 rounded shadow p-4 text-xs whitespace-pre-wrap break-words border border-zinc-800">
+              <label className="text-sm font-semibold mb-1 block text-gray-200">Raw QR Scan Result:</label>
+              <pre className="bg-zinc-800 p-2 rounded text-red-400">{lastScanRaw}</pre>
             </div>
           )}
 
-          <div className="bg-white rounded shadow p-4 text-center">
-            <p className="text-sm text-gray-600 mb-2">For demo purposes:</p>
-            <button
-              onClick={generateSampleQR}
-              className="w-full border text-black rounded px-4 py-2 hover:bg-gray-100 flex items-center justify-center gap-2"
-            >
-              <TicketIcon className="w-4 h-4" /> Use Sample Ticket
-            </button>
-          </div>
+
         </div>
       </div>
     );
   }
 
-  // Handle other UI states similarly...
   if (appState === 'scanned') {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 text-black">
+      <div className="min-h-screen bg-black p-4 text-gray-100">
         <div className="max-w-md mx-auto space-y-6">
+          <Logo />
           <div className="text-center py-4">
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
-              <Check className="w-6 h-6 text-green-600" />
+            <div className="mx-auto w-14 h-14 bg-black border-4 border-green-600 rounded-full flex items-center justify-center mb-3 shadow-lg">
+              <Check className="w-7 h-7 text-green-400" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">QR Code Scanned</h1>
-            <p className="text-gray-600 text-sm mt-1">Complete the check-in process</p>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight">QR Code Scanned</h1>
+            <p className="text-gray-400 text-base mt-1 font-medium">Complete the check-in process</p>
           </div>
 
-          <div className="bg-white shadow rounded-lg p-4">
-            <div className="text-lg font-semibold flex items-center gap-2 mb-2">
+          <div className="bg-zinc-900 shadow rounded-lg p-4 border border-zinc-800">
+            <div className="text-lg font-bold flex items-center gap-2 mb-2 text-red-500">
               <Ticket className="w-5 h-5" /> Ticket Information
             </div>
-            <p className="text-sm text-gray-500 mb-4">Scanned from QR code</p>
+            <p className="text-sm text-gray-400 mb-4">Scanned from QR code</p>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <User className="w-4 h-4 text-gray-500" />
+                <User className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-gray-900">{ticketData?.name}</p>
-                  <p className="text-sm text-gray-600">Participant Name</p>
+                  <p className="font-medium text-gray-100">{ticketData?.name}</p>
+                  <p className="text-sm text-gray-400">Participant Name</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <Hash className="w-4 h-4 text-gray-500" />
+                <Hash className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-gray-900">{ticketData?.registrationId}</p>
-                  <p className="text-sm text-gray-600">Registration ID</p>
+                  <p className="font-medium text-gray-100">{ticketData?.registrationId}</p>
+                  <p className="text-sm text-gray-400">Registration ID</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <Ticket className="w-4 h-4 text-gray-500" />
+                <Ticket className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-gray-900">{ticketData?.ticketType}</p>
-                  <p className="text-sm text-gray-600">Ticket Type</p>
+                  <p className="font-medium text-gray-100">{ticketData?.ticketType}</p>
+                  <p className="text-sm text-gray-400">Ticket Type</p>
                 </div>
               </div>
             </div>
@@ -376,41 +330,40 @@ export default function QRCheckinApp() {
             <div className="flex justify-center">
               <button
                 type="button"
-                className="mt-2 flex items-center gap-2 px-4 py-2 border rounded hover:bg-gray-100"
+                className="mt-2 flex items-center gap-2 px-4 py-2 border border-zinc-700 rounded hover:bg-zinc-800 text-gray-100 font-semibold"
                 onClick={() => setShowScanResult((v) => !v)}
               >
-                {/* Eye icon not imported, so fallback */}
                 {showScanResult ? 'Hide Scan Result' : 'Show Scan Result'}
               </button>
             </div>
           )}
 
           {showScanResult && lastScanRaw && (
-            <div className="bg-white rounded shadow p-4 text-xs whitespace-pre-wrap break-words">
-              <label className="text-sm font-semibold mb-1 block">Raw QR Scan Result:</label>
-              <pre className="bg-gray-100 p-2 rounded">{lastScanRaw}</pre>
+            <div className="bg-zinc-900 rounded shadow p-4 text-xs whitespace-pre-wrap break-words border border-zinc-800">
+              <label className="text-sm font-semibold mb-1 block text-gray-200">Raw QR Scan Result:</label>
+              <pre className="bg-zinc-800 p-2 rounded text-red-400">{lastScanRaw}</pre>
             </div>
           )}
 
-          <div className="bg-white shadow rounded-lg p-4">
-            <div className="text-lg font-semibold mb-2 text-black">Check-in Details</div>
-            <p className="text-sm text-gray-500 mb-4">Complete the check-in process</p>
-            <form onSubmit={() => { }} className="space-y-4 text-black">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
+          <div className="bg-zinc-900 shadow rounded-lg p-4 border border-zinc-800">
+            <div className="text-lg font-bold mb-2 text-red-500">Check-in Details</div>
+            <p className="text-sm text-gray-400 mb-4">Complete the check-in process</p>
+            <form onSubmit={() => { }} className="space-y-4 text-gray-100">
+              <div className="flex items-center justify-between p-3 border border-zinc-800 rounded-lg bg-black">
                 <div>
                   <label htmlFor="present" className="font-medium">Mark as Present</label>
-                  <p className="text-sm text-gray-600">Confirm participant attendance</p>
+                  <p className="text-sm text-gray-400">Confirm participant attendance</p>
                 </div>
                 <input
                   id="present"
                   type="checkbox"
-                  className="w-5 h-5"
+                  className="w-5 h-5 accent-red-600"
                   checked={isPresent}
                   onChange={(e) => setIsPresent(e.target.checked)}
                 />
               </div>
 
-              <hr />
+              <hr className="border-zinc-800" />
 
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -422,7 +375,7 @@ export default function QRCheckinApp() {
                     value={checkerName}
                     onChange={(e) => setCheckerName(e.target.value)}
                     required
-                    className="w-full border px-3 py-2 rounded"
+                    className="w-full border border-zinc-700 bg-black px-3 py-2 rounded text-gray-100 placeholder-gray-500"
                   />
                 </div>
 
@@ -435,7 +388,7 @@ export default function QRCheckinApp() {
                     value={checkerEmail}
                     onChange={(e) => setCheckerEmail(e.target.value)}
                     required
-                    className="w-full border px-3 py-2 rounded"
+                    className="w-full border border-zinc-700 bg-black px-3 py-2 rounded text-gray-100 placeholder-gray-500"
                   />
                 </div>
               </div>
@@ -444,13 +397,13 @@ export default function QRCheckinApp() {
                 <button
                   type="button"
                   onClick={resetForNextScan}
-                  className="flex-1 border px-4 py-2 rounded flex items-center justify-center gap-2 hover:bg-gray-100"
+                  className="flex-1 border border-zinc-700 px-4 py-2 rounded flex items-center justify-center gap-2 hover:bg-zinc-800 text-gray-100 font-semibold"
                 >
                   <QrCode className="w-4 h-4" /> Scan Again
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+                  className="flex-1 bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 disabled:opacity-50 font-bold"
                   disabled={!isPresent || isSubmitting}
                 >
                   {isSubmitting ? 'Processing...' : 'Complete Check-in'}
@@ -458,7 +411,7 @@ export default function QRCheckinApp() {
               </div>
 
               {!isPresent && (
-                <div className="bg-yellow-100 text-yellow-800 text-sm p-2 rounded">
+                <div className="bg-yellow-900 text-yellow-300 text-sm p-2 rounded border border-yellow-700">
                   Please mark the participant as present to complete check-in.
                 </div>
               )}
