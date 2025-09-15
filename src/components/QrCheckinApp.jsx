@@ -45,10 +45,10 @@ export default function QRCheckinApp( { username } ) {
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
-    if (!isPresent || !ticketData?.ticketNumber) {
-      setScanError('Please mark as present and ensure ticket is scanned.');
-      return;
-    }
+    // if (!isPresent || !ticketData?.ticketNumber) {
+    //   setScanError('Please mark as present and ensure ticket is scanned.');
+    //   return;
+    // }
     setIsSubmitting(true);
     setScanError('');
     try {
@@ -59,15 +59,14 @@ export default function QRCheckinApp( { username } ) {
         { verifiedBy } // send as body
         )
         .then(response => {
-            console.log('Marked present:', response.data);
+          console.log('Marked present:', response.data);
+          setScannerStatus('Check-in success');
+          alert('Check-in successful');
+          resetForNextScan();
         })
         .catch(error => {
             console.error('Error marking present:', error.response?.data || error.message);
         });
-        
-      console.log('Marked present:', response.data);
-      setScannerStatus('Check-in success');
-      resetForNextScan();
 
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
