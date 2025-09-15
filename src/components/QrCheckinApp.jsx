@@ -99,6 +99,11 @@ useEffect(() => {
       qrScannerRef.current.destroy();
       qrScannerRef.current = null;
     }
+      // Clean up video element to prevent play() interruption error
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
     return;
   }
 
@@ -174,6 +179,11 @@ useEffect(() => {
       qrScannerRef.current.destroy();
       qrScannerRef.current = null;
     }
+      // Clean up video element on unmount
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
   };
 }, [appState, facingMode, isScanning]);
 
