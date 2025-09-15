@@ -1,30 +1,26 @@
+
 import { RotateCcwIcon, XIcon, QrCodeIcon, TicketIcon, Check, Ticket, User, Hash, QrCode, Camera } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner'
-
+ import axios from 'axios';
 // TEDx theme: dark, bold, red/white/black, logo space at top
 
-export default function QRCheckinApp() {
+export default function QRCheckinApp( { username } ) {
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
 
   const [appState, setAppState] = useState('scanning');
   const [cameraError, setCameraError] = useState('');
 
-  const [checkerName, setCheckerName] = useState('');
-  const [checkerEmail, setCheckerEmail] = useState('');
+  // Remove checkerName, checkerEmail
   const [scanError, setScanError] = useState('');
   const [scannerStatus, setScannerStatus] = useState('Initializing...');
   const [debugMessage, setDebugMessage] = useState('');
   const [lastScanRaw, setLastScanRaw] = useState('');
   const [showScanResult, setShowScanResult] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [ticketData, setTicketData] = useState({
-    name: 'John Doe',
-    registrationId: 'REG123',
-    ticketType: 'VIP'
-  });
+  const[ticketNumber,setTicketNumber]=useState('');
+  const [ticketData, setTicketData] = useState({});
 
   const [isPresent, setIsPresent] = useState(false);
 
@@ -34,6 +30,59 @@ export default function QRCheckinApp() {
 
   const [scanner, setScanner] = useState(null)
 
+
+    // Fetch ticket data by ticket number
+  const fetchTicketData = async (ticketNumber) => {
+    try {
+      const response = await axios.get(`http://localhost:3000/students/${ticketNumber}`);
+      setTicketData(response.data);
+      setScanError('');
+    } catch (error) {
+      setScanError(error.response?.data?.error || error.message || 'Failed to fetch ticket data');
+      setTicketData(null);
+    }
+  };
+
+  const handleCheckIn = async (e) => {
+    e.preventDefault();
+    if (!isPresent || !ticketData?.ticketNumber) {
+      setScanError('Please mark as present and ensure ticket is scanned.');
+      return;
+    }
+    setIsSubmitting(true);
+    setScanError('');
+    try {
+      console.log("Sending check-in for:", ticketData.ticketNumber, username);
+      const verifiedBy=username;
+       axios.put(
+        `http://localhost:3000/students/mark-present/${ticketNumber}`,
+        { verifiedBy } // send as body
+        )
+        .then(response => {
+            console.log('Marked present:', response.data);
+        })
+        .catch(error => {
+            console.error('Error marking present:', error.response?.data || error.message);
+        });
+        
+      console.log('Marked present:', response.data);
+      setScannerStatus('Check-in success');
+      resetForNextScan();
+
+    } catch (error) {
+      if (error.response && error.response.data && error.response.data.error) {
+        setScanError(error.response.data.error);
+      } else {
+        setScanError(error.message || 'Check-in failed');
+      }
+      setScannerStatus('Check-in failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+
+
   useEffect(() => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     navigator.mediaDevices.enumerateDevices().then((devices) => {
@@ -42,77 +91,93 @@ export default function QRCheckinApp() {
     });
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    if (appState !== 'scanning' || !isScanning) {
-      if (qrScannerRef.current) {
-        qrScannerRef.current.stop();
-        qrScannerRef.current.destroy();
-        qrScannerRef.current = null;
-      }
-      return;
-    }
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    videoEl.disablePictureInPicture = true;
+useEffect(() => {
+  let isMounted = true;
 
-    setScannerStatus('Initializing...');
-
+  if (appState !== "scanning" || !isScanning) {
     if (qrScannerRef.current) {
       qrScannerRef.current.stop();
       qrScannerRef.current.destroy();
       qrScannerRef.current = null;
     }
-    const constraints = { facingMode: { exact: facingMode } };
-    const qrScanner = new QrScanner(
-      videoEl,
-      (result) => {
-        if (!isMounted) return;
-        setLastScanRaw(result.data || result);
-        setAppState('scanned');
-        setScannerStatus('Scan complete');
-        setDebugMessage('');
-        // Optionally, parse ticketData from result here
-        // setTicketData(...)
-        console.log(result)
-      },
-      constraints
-    );
-    const startScanner = async () => {
-      try {
-        qrScanner.onDecodeError = (error) => {
-          if (
-            error &&
-            typeof error === 'object' &&
-            error.name === 'NotFoundException'
-          ) {
-            return;
-          }
-          setScanError(error.message || String(error));
-          setScannerStatus('Scanner error');
-          setDebugMessage('');
-        };
-        qrScanner.start();
-        setScanner(qrScanner)
-        setScannerStatus('Ready to scan');
-      } catch (err) {
-        setCameraError('Camera error: ' + err.message);
-        setScannerStatus('Camera error');
-        setDebugMessage('');
-      }
-    };
+    return;
+  }
 
-    startScanner();
+  const videoEl = videoRef.current;
+  if (!videoEl) return;
+  videoEl.disablePictureInPicture = true;
 
-    return () => {
-      isMounted = false;
-      if (qrScannerRef.current) {
-        scanner.stop();
-        scanner.destroy();
-        setScanner(null)
+  setScannerStatus("Initializing...");
+
+  if (qrScannerRef.current) {
+    qrScannerRef.current.stop();
+    qrScannerRef.current.destroy();
+    qrScannerRef.current = null;
+  }
+
+  const constraints = { facingMode: { exact: facingMode } };
+
+  const qrScanner = new QrScanner(
+    videoEl,
+    async (result) => {
+      if (!isMounted) return;
+
+      // result is { data: "TX-74MMD2", cornerPoints: [...] }
+      const ticketNumber = result?.data;
+      setLastScanRaw(ticketNumber || "");
+      setAppState("scanned");
+      setScannerStatus("Scan complete");
+      setDebugMessage("");
+
+      if (ticketNumber) {
+        setTicketNumber(ticketNumber);
+        console.log("Scanned ticket number:", ticketNumber);
+
+        // Fetch ticket details from backend
+        await fetchTicketData(ticketNumber);
       }
-    };
-  }, [appState, facingMode, isScanning]);
+
+    },
+    constraints
+  );
+
+  qrScanner.onDecodeError = (error) => {
+    if (
+      error &&
+      typeof error === "object" &&
+      error.name === "NotFoundException"
+    ) {
+      return; // ignore "no QR found in frame"
+    }
+    setScanError(error.message || String(error));
+    setScannerStatus("Scanner error");
+    setDebugMessage("");
+  };
+
+  const startScanner = async () => {
+    try {
+      await qrScanner.start();
+      qrScannerRef.current = qrScanner; // ✅ assign to ref
+      setScannerStatus("Ready to scan");
+    } catch (err) {
+      setCameraError("Camera error: " + err.message);
+      setScannerStatus("Camera error");
+      setDebugMessage("");
+    }
+  };
+
+  startScanner();
+
+  return () => {
+    isMounted = false;
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
+    }
+  };
+}, [appState, facingMode, isScanning]);
+
 
 
 
@@ -271,35 +336,13 @@ export default function QRCheckinApp() {
             </div>
           </div>
 
-          {scanError && (
-            <div className="bg-red-900 text-red-300 px-4 py-2 rounded text-sm border border-red-700 font-semibold">{scanError}</div>
-          )}
-
-          {lastScanRaw && (
-            <div className="text-center">
-              <button
-                onClick={() => setShowScanResult(!showScanResult)}
-                className="mt-2 px-4 py-2 border border-zinc-700 rounded hover:bg-zinc-800 flex items-center gap-2 text-gray-100 font-semibold"
-              >
-                {showScanResult ? 'Hide Scan Result' : 'Show Scan Result'}
-              </button>
-            </div>
-          )}
-
-          {showScanResult && lastScanRaw && (
-            <div className="bg-zinc-900 rounded shadow p-4 text-xs whitespace-pre-wrap break-words border border-zinc-800">
-              <label className="text-sm font-semibold mb-1 block text-gray-200">Raw QR Scan Result:</label>
-              <pre className="bg-zinc-800 p-2 rounded text-red-400">{lastScanRaw}</pre>
-            </div>
-          )}
-
-
         </div>
       </div>
     );
   }
 
   if (appState === 'scanned') {
+
     return (
       <div className="min-h-screen bg-black p-4 text-gray-100">
         <div className="max-w-md mx-auto space-y-6">
@@ -318,6 +361,7 @@ export default function QRCheckinApp() {
             </div>
             <p className="text-sm text-gray-400 mb-4">Scanned from QR code</p>
 
+          {ticketData ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <User className="w-4 h-4 text-gray-400" />
@@ -330,19 +374,56 @@ export default function QRCheckinApp() {
               <div className="flex items-center gap-3">
                 <Hash className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-gray-100">{ticketData?.registrationId}</p>
-                  <p className="text-sm text-gray-400">Registration ID</p>
+                  <p className="font-medium text-gray-100">{ticketData?.ticket?.number}</p>
+                  <p className="text-sm text-gray-400">Ticket Number</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <Ticket className="w-4 h-4 text-gray-400" />
+                <User className="w-4 h-4 text-gray-400" />
                 <div>
-                  <p className="font-medium text-gray-100">{ticketData?.ticketType}</p>
-                  <p className="text-sm text-gray-400">Ticket Type</p>
+                  <p className="font-medium text-gray-100">{ticketData?.email}</p>
+                  <p className="text-sm text-gray-400">Email</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-100">{ticketData?.contact}</p>
+                  <p className="text-sm text-gray-400">Contact</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-100">{ticketData?.college}</p>
+                  <p className="text-sm text-gray-400">College</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-100">{ticketData?.department}</p>
+                  <p className="text-sm text-gray-400">Department</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-100">{ticketData?.participationType}</p>
+                  <p className="text-sm text-gray-400">Participation Type</p>
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="text-center text-red-400 font-semibold">
+              No ticket data found.
+            </div>
+          )}
           </div>
 
           {lastScanRaw && (
@@ -395,7 +476,8 @@ export default function QRCheckinApp() {
                   <QrCode className="w-4 h-4" /> Scan Again
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleCheckIn}
                   className="flex-1 bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 disabled:opacity-50 font-bold"
                   disabled={!isPresent || isSubmitting}
                 >

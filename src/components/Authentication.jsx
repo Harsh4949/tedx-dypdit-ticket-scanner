@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
 
-function Authentication({ setStep }) {
-  const [username, setUsername] = useState('');
+function Authentication({ setStep, setUsername }) {
+  const [usernameInput, setUsernameInput] = useState('');
   const [tedxId, setTedxId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!username.trim() || !tedxId.trim()) {
+    if (!usernameInput.trim() || !tedxId.trim()) {
       setError('Please enter your username and TedxId.');
       return;
     }
@@ -17,6 +17,7 @@ function Authentication({ setStep }) {
       return;
     }
     setError('');
+    setUsername(usernameInput);
     setStep(2);
   };
 
@@ -39,8 +40,8 @@ function Authentication({ setStep }) {
         <div className="flex flex-col gap-2">
           <input
             type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            value={usernameInput}
+            onChange={e => setUsernameInput(e.target.value)}
             autoComplete="username"
             required
             placeholder="Username"
